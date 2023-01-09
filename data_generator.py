@@ -21,13 +21,13 @@ eu_label = pd.read_excel(r'EU_label.xlsx')
 
 
 
-dirname_low = 'simple_raw_fcs/flowrepo_covid_EU_00%d_flow_001'
-dirname_high = 'simple_raw_fcs/flowrepo_covid_EU_0%d_flow_001'
+dirname_low = 'raw_fcs/flowrepo_covid_EU_00%d_flow_001'
+dirname_high = 'raw_fcs/flowrepo_covid_EU_0%d_flow_001'
 ext = ('.fcs')
 
 
 full_data = []; count = 0
-for i in range(7,42):
+for i in range(2,49):
     if i <=9:
         dirname = dirname_low
     else:
@@ -39,13 +39,11 @@ for i in range(7,42):
                 p = pathlib.Path(files)
                 s = FlowCal.io.FCSData(os.path.join(dirname %i, files))
                 s = s[:, channels]
-                # print(s.channels)
                 s = np.asarray(s)
                 added_s = np.empty_like(s, shape=(s.shape[0], 32))
                 added_s[:, :-1] = s
                 if eu_label.iat[count,1] == 'Healthy':
                     added_s[:, -1] = 0 # '0' means "healthy"
-                    count = count + 15
                 else:
                     added_s[:, -1] = 1 # '1' means "sick"
                 print(i, ", ", s.shape, ", label = ", added_s[0,31])
@@ -60,5 +58,5 @@ full_data = np.asarray(full_data)
 np.random.shuffle(full_data)
 print("final_full_data: ", np.shape(full_data))
 # print(full_data[:,31])
-# np.save('simple_data_shuffle', full_data)
-np.savetxt('simple_data_shuffle.txt', full_data, delimiter=',', fmt='%f')
+# np.save('full_data_shuffle', full_data)
+# np.savetxt('full_data_shuffle.txt', full_data, delimiter=',', fmt='%f')
