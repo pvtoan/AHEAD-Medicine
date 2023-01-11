@@ -1,11 +1,11 @@
 '''
-this code is to create a full data set including 6049758 samples
-in a single sample, it includes 31 features and 1 label as the input and output, respectively.
-the output file is *.npy file
+This code is to validate the trained model for each single sample
+This code is mostly the same as "predictor.py" but it is made simpler when removing redundant parts
 
+In fact, this code just load data set, trained model.
+Then, it will show prediction result vs. the ground truth for each single sample
 
-
-# Notes: writing the part to save trained model
+Just run this code to see the result
 '''
 
 import numpy as np
@@ -21,8 +21,10 @@ import torchvision.transforms as transforms
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # load data set from *.npy file
-data = np.load('simple_data_shuffle.npy')
-# data = np.load('full_data_shuffle.npy')
+# Note that: "simple_data_shuffle.npy" can be downloaded directly from my github
+# while "full_data_shuffle.npy" is too large to upload to my github
+data = np.load('simple_data_shuffle.npy') # activate this command if you do NOT have the full data set
+# data = np.load('full_data_shuffle.npy') # activate this command if you do have the full data set
 transform = transforms.Normalize(0.5, 0.5)
 
 x_train = data[:,0:31]
@@ -41,48 +43,22 @@ print('=' * 30)
 print('Train data set:', len(train_set))
 print('Valid data set:', len(valid_set))
 
-train_loader = DataLoader(dataset=train_set, batch_size=1000)
-val_loader = DataLoader(dataset=valid_set, batch_size=1000)
 
 
 criterion = nn.L1Loss()
 class classification(nn.Module):
     def training_step(self, batch):
-        images, labels = batch
+        feats, labels = batch
 
-        images = images[:,:,None, None]
-        images = transform(images) # normalize data set
-        images = torch.squeeze(images)
+        feats = feats[:,:,None, None]
+        feats = transform(feats) # normalize data set
+        feats = torch.squeeze(feats)
 
-        output = self(images)  # Generate predictions
+        output = self(feats)  # Generate predictions
         output = output.reshape(-1)
-        # loss = torch.nn.BCELoss(output, labels)  # Calculate loss
         loss = criterion(output, labels)
         return loss
 
-    def validation_step(self, batch):
-        images, labels = batch
-
-        images = images[:,:,None, None]
-        images = transform(images) # normalize data set
-        images = torch.squeeze(images)
-
-        output = torch.round(self(images)) # Generate predictions
-        output = output.reshape(-1)
-        loss = criterion(output, labels)  # Calculate loss
-        acc = accuracy(output, labels)  # Calculate accuracy
-        return {'val_loss': loss.detach(), 'val_acc': acc}
-
-    def validation_epoch_end(self, outputs):
-        batch_losses = [x['val_loss'] for x in outputs]
-        epoch_loss = torch.stack(batch_losses).mean()  # Combine losses
-        batch_accs = [x['val_acc'] for x in outputs]
-        epoch_acc = torch.stack(batch_accs).mean()  # Combine accuracies
-        return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
-
-    def epoch_end(self, epoch, result):
-        print("Epoch [{}], train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
-            epoch, result['train_loss'], result['val_loss'], result['val_acc']))
 
 
 class predictor(classification):
@@ -101,28 +77,13 @@ class predictor(classification):
             nn.ReLU(),
             nn.Linear(256, 1),
         )
-
     def forward(self, input: torch.Tensor):
         return self.network(input)
-
-def accuracy(outputs, labels):
-    correct = torch.eq(labels, outputs).sum().item() # torch.eq() calculates where two tensors are equal
-    acc = torch.tensor((correct / len(outputs)) * 100)
-    return acc
-
-
-@torch.no_grad()
-def evaluate(model, val_loader):
-    model.eval()
-    outputs = [model.validation_step(batch) for batch in val_loader]
-    return model.validation_epoch_end(outputs)
-
 
 
 num_epochs = 30
 opt_func = torch.optim.Adam
 lr = 1e-4
-
 
 
 model = predictor()
@@ -131,15 +92,12 @@ model.load_state_dict(torch.load('model_best.pt'))
 model.eval()
 
 
-
-# data = torch.FloatTensor(1, 31).cuda()
 data = valid_set.dataset[0][0].cuda()
 label = valid_set.dataset[0][1].cuda()
-print("d: ", data.shape)
 
 data = data[None,:,None, None]
 data = transform(data) # normalize data set
 data = torch.squeeze(data)
 
 output = torch.round(model(data)) # Generate predictions
-print("output: ", output.item(), " vs. ", label.item())
+print("prediction: ", output.item(), " vs. ground truth", label.item())

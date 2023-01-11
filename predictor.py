@@ -1,11 +1,25 @@
 '''
-this code is to create a full data set including 6049758 samples
-in a single sample, it includes 31 features and 1 label as the input and output, respectively.
-the output file is *.npy file
+This code is to build and train a neural network model for binary classification
+The main procedures are as follows.
 
+1. Load the pre-generated data set *.npy file
+Then, split into two training and validation data sets
 
+2. Build a neural network model with input size and output size of 31 and 1, respectively
+Also, create related optimizer, parameters, ...
+(found in predictor())
 
-# Notes: writing the part to save trained model
+3. Write the parts for training and validating each step, ...
+(found in classification())
+
+4. Write the parts for evaluating the trained model and computing the accuracy
+(found in accuracy() and evaluate())
+
+5. Write the part to train the model and save the best learned weight set
+(found in fit())
+
+--> To run this "predictor.py", just make sure you have the data set *.npy file in the same folder,
+then, just run and see the result.
 '''
 
 import numpy as np
@@ -20,8 +34,12 @@ from torch.utils.data.dataset import random_split
 import torchvision.transforms as transforms
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-# load data set from *.npqy file
-data = np.load('simple_data_shuffle.npy')
+# load data set from *.npy file
+# Note that: "simple_data_shuffle.npy" can be downloaded directly from my github
+# while "full_data_shuffle.npy" is too large to upload to my github
+data = np.load('simple_data_shuffle.npy') # activate this command if you do NOT have the full data set
+# data = np.load('full_data_shuffle.npy') # activate this command if you do have the full data set
+
 transform = transforms.Normalize(0.5, 0.5)
 
 x_train = data[:,0:31]
@@ -35,41 +53,37 @@ dataset = TensorDataset(x_train_tensor, y_train_tensor)
 train_set_size = int(len(dataset) * 0.8)
 valid_set_size = len(dataset) - train_set_size
 train_set, valid_set = random_split(dataset, [train_set_size, valid_set_size])
-# print("valid_set: ", valid_set.cpu().detach().numpy())
 # After
 print('=' * 30)
 print('Train data set:', len(train_set))
 print('Valid data set:', len(valid_set))
 
-train_loader = DataLoader(dataset=train_set, batch_size=16, shuffle=True)
-val_loader = DataLoader(dataset=valid_set, batch_size=16, shuffle=False)
+train_loader = DataLoader(dataset=train_set, batch_size=500, shuffle=True)
+val_loader = DataLoader(dataset=valid_set, batch_size=500, shuffle=False)
 
 
 criterion = nn.L1Loss()
 class classification(nn.Module):
     def training_step(self, batch):
-        images, labels = batch
+        feats, labels = batch
 
-        images = images[:,:,None, None]
-        images = transform(images) # normalize data set
-        images = torch.squeeze(images)
+        feats = feats[:,:,None, None]
+        feats = transform(feats) # normalize data set
+        feats = torch.squeeze(feats)
 
-        # print("images: ", images.shape) # images:  torch.Size([1000, 31])
-
-        output = self(images)  # Generate predictions
+        output = self(feats)  # Generate predictions
         output = output.reshape(-1)
-        # loss = torch.nn.BCELoss(output, labels)  # Calculate loss
         loss = criterion(output, labels)
         return loss
 
     def validation_step(self, batch):
-        images, labels = batch
+        feats, labels = batch
 
-        images = images[:,:,None, None]
-        images = transform(images) # normalize data set
-        images = torch.squeeze(images)
+        feats = feats[:,:,None, None]
+        feats = transform(feats) # normalize data set
+        feats = torch.squeeze(feats)
 
-        output = torch.round(self(images)) # Generate predictions
+        output = torch.round(self(feats)) # Generate predictions
 
         output = output.reshape(-1)
         loss = criterion(output, labels)  # Calculate loss
@@ -114,7 +128,6 @@ def accuracy(outputs, labels):
     return acc
 
 
-# @torch.no_grad()
 def evaluate(model, val_loader):
     model.eval()
     outputs = [model.validation_step(batch) for batch in val_loader]
